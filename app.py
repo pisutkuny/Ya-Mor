@@ -157,13 +157,9 @@ def configure_genai():
 
 def extract_data_from_image(image):
     # List of models to try in order of preference
-    # 1.5 Flash is fastest/cheapest. 1.5 Pro is better. Pro Vision is legacy (but reliable).
     candidate_models = [
         'gemini-1.5-flash',
-        'gemini-1.5-flash-001',
-        'gemini-1.5-flash-002',
         'gemini-1.5-pro',
-        'gemini-pro-vision',
     ]
     
     prompt = """
@@ -180,7 +176,7 @@ def extract_data_from_image(image):
     """
     
     with st.spinner('🤖 กำลังอ่านข้อมูลจากรูปภาพ... (AI Scan)'):
-        last_error = None
+        errors = []
         for model_name in candidate_models:
             try:
                 # Create model instance
@@ -192,13 +188,20 @@ def extract_data_from_image(image):
                 data = json.loads(text)
                 return data
             except Exception as e:
-                # Log error internally or print to console if needed
-                print(f"Model {model_name} failed: {e}")
-                last_error = e
+                errors.append(f"{model_name}: {str(e)}")
                 continue # Try next model
         
-        # If all failed
-        st.error(f"ขออภัย ไม่สามารถวิเคราะห์รูปภาพได้ (ลองทุกโมเดลแล้ว): {last_error}")
+        # If all failed, try to list available models to help validation
+        available_models = []
+        try:
+            for m in genai.list_models():
+                if 'generateContent' in m.supported_generation_methods:
+                    available_models.append(m.name)
+        except Exception as e:
+            available_models = [f"Could not list models: {str(e)}"]
+
+        error_msg = "\n".join(errors)
+        st.error(f"❌ ไม่สามารถวิเคราะห์รูปภาพได้\n\n**Error Logs:**\n{error_msg}\n\n**Available Models for your Key:**\n{', '.join(available_models)}")
         return None
 
 # --- Main App Interface ---
