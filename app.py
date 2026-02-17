@@ -1,362 +1,212 @@
 import streamlit as st
-import google.generativeai as genai
-from PIL import Image
 import pandas as pd
-import sqlite3
-import json
 import datetime
-from icalendar import Calendar, Event
-import io
-import time
+from PIL import Image
+
+# Import Modules
+from modules import database, ai_vision, ui_components, notifications
 
 # --- Configuration & Setup ---
 st.set_page_config(
-    page_title="Ya-Mor (ยาหมอ)",
+    page_title="Ya-Mor (ยาหมอ) V2",
     page_icon="💊",
-    layout="centered",
+    layout="centered", # Mobile layout focus
     initial_sidebar_state="collapsed"
 )
 
-# --- Custom CSS for Elderly Friendly UI ---
+# Initialize DB
+database.init_db()
+ai_vision.configure_genai()
+
+# --- Custom CSS for Senior UI ---
 st.markdown("""
 <style>
-    /* Increase base font size */
+    /* Global Font Increase */
     html, body, [class*="css"] {
-        font-family: 'Sarabun', sans-serif; /* A clear Thai font if available */
-        font-size: 18px;
+        font-family: 'Sarabun', sans-serif;
+        font-size: 20px;
     }
     
-    /* Header styling */
-    h1 {
-        font-size: 2.2rem !important;
-        color: #2E86C1;
-        text-align: center;
-        margin-bottom: 0.5rem;
-    }
-    h2 {
-        font-size: 1.8rem !important;
-        color: #2874A6;
-        border-bottom: 2px solid #AED6F1;
-        padding-bottom: 0.5rem;
-        margin-top: 2rem;
-    }
-    h3 {
-        font-size: 1.5rem !important;
-        color: #1F618D;
-    }
-
-    /* Button styling - Big & Clickable */
+    /* Big Headers */
+    h1 { font-size: 2.5rem !important; color: #1B4F72; text-align: center; }
+    h2 { font-size: 2rem !important; color: #154360; border-bottom: 2px solid #D4E6F1; }
+    h3 { font-size: 1.6rem !important; color: #21618C; }
+    
+    /* Button overrides are in ui_components.py but global stButton needs size */
     .stButton > button {
-        width: 100%;
-        height: 60px;
-        font-size: 1.2rem !important;
-        font-weight: bold;
-        border-radius: 12px;
-        background-color: #3498DB;
-        color: white;
-        border: none;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: all 0.3s ease;
-    }
-    .stButton > button:hover {
-        background-color: #2980B9;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+        height: 70px;
+        font-size: 1.5rem !important;
+        border-radius: 15px;
+        margin-bottom: 10px;
     }
     
-    /* Success/Primary Action Button override */
-    div[data-testid="stVerticalBlock"] > div:nth-child(5) .stButton > button {
-         background-color: #28B463; /* Green for confirm */
-    }
-
     /* Input fields */
-    .stTextInput > div > div > input {
-        font-size: 1.1rem;
-        padding: 10px;
-    }
-    
-    /* Cards for appointments */
-    .appointment-card {
-        background-color: #F8F9F9;
-        border: 1px solid #D6DBDF;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-left: 5px solid #3498DB;
-    }
-    .appointment-card strong {
-        color: #2E86C1;
-        font-size: 1.1rem;
+    div[data-baseweb="input"] > div {
+        height: 50px;
+        font-size: 1.2rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Database Management ---
-DB_FILE = 'appointments.db'
+# --- Session State ---
+if 'page' not in st.session_state:
+    st.session_state.page = 'dashboard' # dashboard, scan, settings
 
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS appointments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            hospital TEXT,
-            doctor TEXT,
-            date TEXT,
-            time TEXT,
-            note TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    conn.commit()
-    conn.close()
+def navigate_to(page):
+    st.session_state.page = page
+    st.rerun()
 
-def save_appointment(hospital, doctor, date_str, time_str, note):
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute('''
-            INSERT INTO appointments (hospital, doctor, date, time, note)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (hospital, doctor, date_str, time_str, note))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
-        return False
+# --- Pages ---
 
-def load_appointments():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query("SELECT * FROM appointments ORDER BY date DESC, time ASC", conn)
-    conn.close()
-    return df
-
-# Initialize DB on load
-init_db()
-
-# --- Gemini AI Integration ---
-def configure_genai():
-    api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key:
-        # Check system env var as fallback or just prompt user
-        import os
-        api_key = os.environ.get("GEMINI_API_KEY")
+def render_dashboard():
+    st.title("🏡 หน้าหลัก (ยาหมอ)")
     
-    if not api_key:
-        st.warning("⚠️ ไม่พบ API Key! กรุณาตั้งค่า `GEMINI_API_KEY` ใน `.streamlit/secrets.toml`")
-        st.info("หรือใส่ key ชั่วคราวที่นี่ (ไม่แนะนำสำหรับการใช้งานจริง):")
-        temp_key = st.text_input("Enter Gemini API Key", type="password")
-        if temp_key:
-            genai.configure(api_key=temp_key)
-            return True
-        return False
+    # 1. User Info / Settings Link
+    user_settings = database.get_user_settings()
+    if not user_settings or not user_settings['line_token']:
+        st.warning("⚠️ ยังไม่ได้ตั้งค่าผู้ดูแล (Line)")
+        if st.button("⚙️ ตั้งค่าระบบ", use_container_width=True):
+            navigate_to('settings')
     else:
-        genai.configure(api_key=api_key)
-        return True
+        if st.button(f"⚙️ ตั้งค่า (คุณ: {user_settings['name']})", use_container_width=True):
+            navigate_to('settings')
 
-def extract_data_from_image(image):
-    # List of models to try in order of preference
-    candidate_models = [
-        'gemini-2.0-flash',
-        'gemini-flash-latest',
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-    ]
+    st.divider()
+
+    # 2. Urgent / Current Dose (Logic: Morning, Noon, Evening, Bedtime)
+    current_hour = datetime.datetime.now().hour
+    period = "morning"
+    if 11 <= current_hour < 16: period = "noon"
+    elif 16 <= current_hour < 20: period = "evening"
+    elif current_hour >= 20: period = "bedtime"
     
-    prompt = """
-    คุณคือผู้ช่วยอัจฉริยะวิเคราะห์ใบนัดแพทย์ ดูรูปภาพนี้แล้วดึงข้อมูลออกมาเป็น JSON format ดังนี้:
-    {
-        "hospital_name": "ชื่อโรงพยาบาล (ถ้ามี)",
-        "doctor_name": "ชื่อแพทย์ (ถ้ามี)",
-        "appointment_date": "YYYY-MM-DD (แปลงจาก พ.ศ. เป็น ค.ศ. ให้ถูกต้อง - ลบ 543)",
-        "appointment_time": "HH:MM (24-hour format)",
-        "note": "หมายเหตุเพิ่มเติม หรือ สิ่งที่ต้องเตรียมตัว (ถ้ามี)"
+    period_map = {
+        "morning": "☀️ เช้า",
+        "noon": "☀️ เที่ยง",
+        "evening": "🌆 เย็น",
+        "bedtime": "🌙 ก่อนนอน"
     }
-    ถ้าไม่เจอข้อมูล ให้ใส่ null หรือ "ไม่ระบุ".
-    ตอบกลับเฉพาะ JSON เท่านั้น ไม่ต้องมี markdown block.
-    """
     
-    with st.spinner('🤖 กำลังอ่านข้อมูลจากรูปภาพ... (AI Scan)'):
-        errors = []
-        for model_name in candidate_models:
-            try:
-                # Create model instance
-                model = genai.GenerativeModel(model_name)
-                
-                # Generate content
-                response = model.generate_content([prompt, image])
-                text = response.text.replace('```json', '').replace('```', '').strip()
-                data = json.loads(text)
-                return data
-            except Exception as e:
-                errors.append(f"{model_name}: {str(e)}")
-                continue # Try next model
-        
-        # If all failed, try to list available models to help validation
-        available_models = []
-        try:
-            for m in genai.list_models():
-                if 'generateContent' in m.supported_generation_methods:
-                    available_models.append(m.name)
-        except Exception as e:
-            available_models = [f"Could not list models: {str(e)}"]
-
-        error_msg = "\n".join(errors)
-        st.error(f"❌ ไม่สามารถวิเคราะห์รูปภาพได้\n\n**Error Logs:**\n{error_msg}\n\n**Available Models for your Key:**\n{', '.join(available_models)}")
-        return None
-
-# --- Main App Interface ---
-
-def main():
-    st.title("🏥 Ya-Mor (ยาหมอ)")
-    st.caption("ผู้ช่วยจำนัด สำหรับทุกวัย ใช้ง่าย สบายตา")
-
-    # API Check
-    api_ready = configure_genai()
-
-    # --- Section 1: Upload ---
-    st.header("1. 📸 เพิ่มนัดหมายใหม่")
+    st.header(f"💊 ยาที่ต้องทาน: {period_map[period]}")
     
-    uploaded_file = st.file_uploader("ถ่ายรูปใบนัด หรือ อัปโหลดรูปภาพ", type=['jpg', 'jpeg', 'png'])
+    # Fetch meds
+    meds_df = database.get_medications()
     
-    # Session State for form data
-    if 'form_data' not in st.session_state:
-        st.session_state.form_data = {
-            'hospital': '', 'doctor': '', 'date': datetime.date.today(), 'time': datetime.time(9, 0), 'note': ''
-        }
-    
-    # Logic to handle if file is uploaded
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        st.image(image, caption='รูปภาพที่อัปโหลด', use_column_width=True)
-        
-        if api_ready:
-            if st.button("🔍 อ่านข้อมูลอัตโนมัติ (AI Scan)", key="scan_btn"):
-                result = extract_data_from_image(image)
-                if result:
-                    st.session_state.form_data['hospital'] = result.get('hospital_name') or ''
-                    st.session_state.form_data['doctor'] = result.get('doctor_name') or ''
-                    st.session_state.form_data['note'] = result.get('note') or ''
-                    
-                    # Parse Date
-                    date_str = result.get('appointment_date')
-                    if date_str:
-                        try:
-                            # Try multiple formats if needed, but ISO is requested
-                            d = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
-                            st.session_state.form_data['date'] = d
-                        except:
-                            pass # Keep default today
-                    
-                    # Parse Time
-                    time_str = result.get('appointment_time')
-                    if time_str:
-                        try:
-                            t = datetime.datetime.strptime(time_str, "%H:%M").time()
-                            st.session_state.form_data['time'] = t
-                        except:
-                            pass # Keep default 9:00
-                    st.success("อ่านข้อมูลสำเร็จ! โปรดตรวจสอบด้านล่าง")
-
-    # --- Section 2: Verify & Edit ---
-    # Show form if file uploaded OR manual entry requested
-    if uploaded_file or st.session_state.get('manual_entry', False):
-        st.header("2. 📝 ตรวจสอบและแก้ไข")
-        
-        with st.form("appointment_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                hospital = st.text_input("ชื่อโรงพยาบาล", value=st.session_state.form_data['hospital'])
-            with col2:
-                doctor = st.text_input("ชื่อแพทย์", value=st.session_state.form_data['doctor'])
-            
-            col3, col4 = st.columns(2)
-            with col3:
-                appt_date = st.date_input("วันที่นัด", value=st.session_state.form_data['date'])
-            with col4:
-                appt_time = st.time_input("เวลานัด", value=st.session_state.form_data['time'])
-            
-            note = st.text_area("หมายเหตุ / สิ่งที่ต้องเตรียม", value=st.session_state.form_data['note'])
-            
-            submitted = st.form_submit_button("✅ บันทึกนัดหมาย (Save)")
-            
-            if submitted:
-                # Basic validation
-                if not hospital:
-                    st.error("กรุณาระบุชื่อโรงพยาบาล")
-                else:
-                    success = save_appointment(
-                        hospital, doctor, appt_date.strftime("%Y-%m-%d"), appt_time.strftime("%H:%M"), note
-                    )
+    has_meds_now = False
+    if not meds_df.empty:
+        for index, row in meds_df.iterrows():
+            # Check frequency in JSON string
+            if period in row['frequency']:
+                has_meds_now = True
+                def on_take(mid, mname):
+                    success = database.log_activity(mid, 'taken', f"Taken at {period}")
                     if success:
-                        st.success("บันทึกข้อมูลเรียบร้อยแล้ว!")
-                        time.sleep(1) # feedback delay
-                        # Reset
-                        st.session_state.form_data = {
-                            'hospital': '', 'doctor': '', 'date': datetime.date.today(), 'time': datetime.time(9, 0), 'note': ''
-                        }
-                        st.session_state.manual_entry = False
+                        st.success(f"เก่งมาก! ทาน {mname} แล้ว")
+                        # Line Alert
+                        if user_settings and user_settings['line_token']:
+                            notifications.send_line_notify(
+                                user_settings['line_token'], 
+                                f"👵 {user_settings['name']} ทานยา '{mname}' รอบ {period_map[period]} แล้วค่ะ ✅"
+                            )
                         st.rerun()
+                
+                ui_components.med_card(
+                    (row['id'], row['name'], row['image_path'], row['dosage'], row['frequency'], row['stock'], row['created_at']),
+                    on_click_action=on_take
+                )
 
-    # Toggle manual entry button (only show if no file uploaded and not already in manual mode)
-    if not uploaded_file and not st.session_state.get('manual_entry', False):
-        if st.button("✍️ กรอกข้อมูลเอง (ไม่ใช้รูปภาพ)"):
-            st.session_state.manual_entry = True
+    if not has_meds_now:
+        st.success("✅ ตอนนี้ยังไม่มียาที่ต้องทาน พักผ่อนได้เลย")
+
+    st.divider()
+
+    # 3. Add New Med Button
+    if st.button("📸 เพิ่มยาใหม่ (ถ่ายรูป)", type="primary", use_container_width=True):
+        navigate_to('scan')
+    
+    st.divider()
+    
+    # 4. SOS Button
+    st.markdown("""
+        <a href="tel:1669" style="text-decoration: none;">
+            <button style="
+                width: 100%; height: 80px; background-color: #C0392B; color: white; 
+                font-size: 2rem; border-radius: 20px; border: none; font-weight: bold; cursor: pointer;">
+                🚑 แจ้งฉุกเฉิน (โทรลูกหลาน)
+            </button>
+        </a>
+    """, unsafe_allow_html=True)
+    st.caption("*กดปุ่มแดงเพื่อโทรออกทันที")
+
+def render_scan():
+    st.title("📸 เพิ่มยาใหม่")
+    if st.button("⬅️ กลับหน้าหลัก"):
+        navigate_to('dashboard')
+        
+    uploaded_file = st.file_uploader("ถ่ายรูปซองยา/ขวดยา", type=['jpg', 'jpeg', 'png'])
+    
+    if uploaded_file:
+        image = Image.open(uploaded_file)
+        st.image(image, caption='รูปยา', use_column_width=True)
+        
+        if st.button("🔍 ให้ AI อ่านฉลากยา", type="primary"):
+            data = ai_vision.extract_medicine_info(image)
+            if data:
+                st.session_state.scanned_data = data
+                st.success("อ่านฉลากเสร็จแล้ว! ตรวจสอบด้านล่าง")
+            
+    if 'scanned_data' in st.session_state:
+        data = st.session_state.scanned_data
+        
+        with st.form("save_med_form"):
+            name = st.text_input("ชื่อยา", value=data.get('medicine_name', ''))
+            dosage = st.text_input("ปริมาณ (เช่น 1 เม็ด)", value=data.get('dosage', ''))
+            
+            st.subheader("ทานเวลาไหนบ้าง?")
+            # Default Checks
+            default_freq = data.get('frequency', [])
+            c1, c2, c3, c4 = st.columns(4)
+            morning = c1.checkbox("เช้า", "morning" in default_freq)
+            noon = c2.checkbox("เที่ยง", "noon" in default_freq)
+            evening = c3.checkbox("เย็น", "evening" in default_freq)
+            bedtime = c4.checkbox("ก่อนนอน", "bedtime" in default_freq)
+            
+            stock = st.number_input("จำนวนยาที่มี (เม็ด)", min_value=0, value=10)
+            
+            if st.form_submit_button("💾 บันทึกข้อมูลยา"):
+                freq_list = []
+                if morning: freq_list.append("morning")
+                if noon: freq_list.append("noon")
+                if evening: freq_list.append("evening")
+                if bedtime: freq_list.append("bedtime")
+                
+                success = database.add_medication(name, "path/to/img", dosage, freq_list, stock)
+                if success:
+                    st.success("บันทึกเรียบร้อย!")
+                    del st.session_state.scanned_data
+                    navigate_to('dashboard')
+
+def render_settings():
+    st.title("⚙️ ตั้งค่าระบบ")
+    if st.button("⬅️ กลับหน้าหลัก"):
+        navigate_to('dashboard')
+
+    current = database.get_user_settings() or {}
+    
+    with st.form("settings_form"):
+        name = st.text_input("ชื่อผู้สูงอายุ (เช่น คุณยาย)", value=current.get('name', ''))
+        line_token = st.text_input("Line Notify Token (สำหรับลูกหลาน)", value=current.get('line_token', ''), type="password")
+        st.caption("ไปที่ https://notify-bot.line.me/my/ เพื่อออก Token")
+        
+        if st.form_submit_button("บันทึก"):
+            database.save_user_settings(name, line_token)
+            st.success("บันทึกค่าเรียบร้อย")
             st.rerun()
 
-    # --- Section 3: List ---
-    st.header("3. 📅 รายการนัดหมายของคุณ")
-    
-    df = load_appointments()
-    
-    if not df.empty:
-        # Create ICS Calendar object for bulk download
-        cal = Calendar()
-        cal.add('prodid', '-//Ya-Mor App//mxm.dk//')
-        cal.add('version', '2.0')
-        
-        for index, row in df.iterrows():
-            # Display Card
-            with st.container():
-                st.markdown(f"""
-                <div class="appointment-card">
-                    <h3>🏥 {row['hospital']}</h3>
-                    <p><strong>👨‍⚕️ แพทย์:</strong> {row['doctor'] or '-'}</p>
-                    <p><strong>📅 วันที่:</strong> {row['date']} <strong>เวลา:</strong> {row['time']} น.</p>
-                    <p><strong>📝 โน้ต:</strong> {row['note'] or '-'}</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Add to ICS
-            event = Event()
-            event.add('summary', f"นัดหมอ: {row['hospital']}")
-            try:
-                # Combine date and time for ICS start
-                start_dt = datetime.datetime.strptime(f"{row['date']} {row['time']}", "%Y-%m-%d %H:%M")
-                event.add('dtstart', start_dt)
-                event.add('dtend', start_dt + datetime.timedelta(hours=1)) # Default duration 1 hour
-                event.add('description', f"แพทย์: {row['doctor']}\nหมายเหตุ: {row['note']}")
-                cal.add_component(event)
-            except:
-                pass # Skip if date format error
-
-        # --- Section 4: Export (Bulk) ---
-        st.divider()
-        try:
-            ics_data = cal.to_ical()
-            st.download_button(
-                label="📥 ดาวน์โหลดปฏิทิน (.ics) ทั้งหมด",
-                data=ics_data,
-                file_name="appointments.ics",
-                mime="text/calendar",
-                key="download-ics-all"
-            )
-        except Exception as e:
-            st.error(f"Generate ICS Error: {e}")
-
-    else:
-        st.info("ยังไม่มีรายการนัดหมาย")
-
-if __name__ == "__main__":
-    main()
+# --- Main Router ---
+if st.session_state.page == 'dashboard':
+    render_dashboard()
+elif st.session_state.page == 'scan':
+    render_scan()
+elif st.session_state.page == 'settings':
+    render_settings()
