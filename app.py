@@ -103,9 +103,10 @@ def render_dashboard():
                     if success:
                         st.success(f"เก่งมาก! ทาน {mname} แล้ว")
                         # Line Alert
-                        if user_settings and user_settings['line_token']:
-                            notifications.send_line_notify(
+                        if user_settings and user_settings.get('line_token') and user_settings.get('user_id'):
+                            notifications.send_line_message(
                                 user_settings['line_token'], 
+                                user_settings['user_id'],
                                 f"👵 {user_settings['name']} ทานยา '{mname}' รอบ {period_map[period]} แล้วค่ะ ✅"
                             )
                         st.rerun()
@@ -195,11 +196,15 @@ def render_settings():
     
     with st.form("settings_form"):
         name = st.text_input("ชื่อผู้สูงอายุ (เช่น คุณยาย)", value=current.get('name', ''))
-        line_token = st.text_input("Line Notify Token (สำหรับลูกหลาน)", value=current.get('line_token', ''), type="password")
-        st.caption("ไปที่ https://notify-bot.line.me/my/ เพื่อออก Token")
+        
+        st.subheader("การแจ้งเตือน LINE (Messaging API)")
+        st.info("เนื่องจาก LINE Notify ปิดให้บริการ เราจึงต้องใช้ Messaging API แทนครับ")
+        line_token = st.text_input("Channel Access Token", value=current.get('line_token', ''), type="password")
+        user_id = st.text_input("Your User ID (คนดูแล)", value=current.get('user_id', ''), type="password")
+        st.caption("ไปที่ https://developers.line.biz/console/ เพื่อสร้าง Channel และเอาค่าเหล่านี้มาใส่")
         
         if st.form_submit_button("บันทึก"):
-            database.save_user_settings(name, line_token)
+            database.save_user_settings(name, line_token, user_id)
             st.success("บันทึกค่าเรียบร้อย")
             st.rerun()
 

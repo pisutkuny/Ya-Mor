@@ -15,7 +15,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             role TEXT, -- 'patient' or 'caregiver'
-            line_token TEXT, -- For Line Notify
+            line_token TEXT, -- For Line Default Channel Access Token
+            user_id TEXT, -- For Line User ID (Target)
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -118,26 +119,37 @@ def get_activity_logs():
     return df
 
 # --- User/Settings Functions ---
-def save_user_settings(name, line_token):
+def save_user_settings(name, line_token, user_id):
     # For simplicity, we assume single user pair mostly, so we update or insert ID 1
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     # Check if exists
     c.execute("SELECT count(*) FROM users WHERE id = 1")
     exists = c.fetchone()[0]
+    
+    # Check column 'user_id' exists (migration for existing DB)
+    try:
+        c.execute("SELECT user_id FROM users LIMIT 1")
+    except sqlite3.OperationalError:
+        c.execute("ALTER TABLE users ADD COLUMN user_id TEXT")
+
     if exists:
-        c.execute("UPDATE users SET name=?, line_token=? WHERE id=1", (name, line_token))
+        c.execute("UPDATE users SET name=?, line_token=?, user_id=? WHERE id=1", (name, line_token, user_id))
     else:
-        c.execute("INSERT INTO users (id, name, line_token) VALUES (1, ?, ?)", (name, line_token))
+        c.execute("INSERT INTO users (id, name, line_token, user_id) VALUES (1, ?, ?, ?)", (name, line_token, user_id))
     conn.commit()
     conn.close()
 
 def get_user_settings():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("SELECT name, line_token FROM users WHERE id = 1")
-    row = c.fetchone()
-    conn.close()
-    if row:
-        return {"name": row[0], "line_token": row[1]}
+    try:
+        c.execute("SELECT name, line_token, user_id FROM users WHERE id = 1")
+        row = c.fetchone()
+        conn.close()
+        if row:
+            return {"name": row[0], "line_token": row[1], "user_id": row[2]}
+    except:
+        conn.close()
+        return None
     return None
