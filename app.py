@@ -156,7 +156,15 @@ def configure_genai():
         return True
 
 def extract_data_from_image(image):
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # List of models to try in order of preference
+    # 1.5 Flash is fastest/cheapest. 1.5 Pro is better. Pro Vision is legacy (but reliable).
+    candidate_models = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-001',
+        'gemini-1.5-flash-002',
+        'gemini-1.5-pro',
+        'gemini-pro-vision',
+    ]
     
     prompt = """
     คุณคือผู้ช่วยอัจฉริยะวิเคราะห์ใบนัดแพทย์ ดูรูปภาพนี้แล้วดึงข้อมูลออกมาเป็น JSON format ดังนี้:
@@ -171,15 +179,27 @@ def extract_data_from_image(image):
     ตอบกลับเฉพาะ JSON เท่านั้น ไม่ต้องมี markdown block.
     """
     
-    with st.spinner('🤖 กำลังอ่านข้อมูลจากรูปภาพ... โปรดรอสักครู่'):
-        try:
-            response = model.generate_content([prompt, image])
-            text = response.text.replace('```json', '').replace('```', '').strip()
-            data = json.loads(text)
-            return data
-        except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดในการวิเคราะห์รูปภาพ: {e}")
-            return None
+    with st.spinner('🤖 กำลังอ่านข้อมูลจากรูปภาพ... (AI Scan)'):
+        last_error = None
+        for model_name in candidate_models:
+            try:
+                # Create model instance
+                model = genai.GenerativeModel(model_name)
+                
+                # Generate content
+                response = model.generate_content([prompt, image])
+                text = response.text.replace('```json', '').replace('```', '').strip()
+                data = json.loads(text)
+                return data
+            except Exception as e:
+                # Log error internally or print to console if needed
+                print(f"Model {model_name} failed: {e}")
+                last_error = e
+                continue # Try next model
+        
+        # If all failed
+        st.error(f"ขออภัย ไม่สามารถวิเคราะห์รูปภาพได้ (ลองทุกโมเดลแล้ว): {last_error}")
+        return None
 
 # --- Main App Interface ---
 
