@@ -158,6 +158,8 @@ def configure_genai():
 def extract_data_from_image(image):
     # List of models to try in order of preference
     candidate_models = [
+        'gemini-2.0-flash',
+        'gemini-flash-latest',
         'gemini-1.5-flash',
         'gemini-1.5-pro',
     ]
