@@ -22,21 +22,21 @@ def med_card(med_data, on_click_action=None):
         st.markdown(f"""
         <div style="
             background-color: #E8F8F5; 
-            padding: 20px; 
-            border-radius: 15px; 
-            border: 2px solid #1ABC9C;
-            margin-bottom: 15px;
+            padding: 25px; 
+            border-radius: 20px; 
+            border: 3px solid #1ABC9C;
+            margin-bottom: 20px;
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
         ">
-            <h2 style="margin:0; color:#0E6251;">💊 {name}</h2>
-            <p style="font-size: 1.2rem; margin: 5px 0;">
+            <h2 style="margin:0; color:#0E6251; font-size: 2.2rem; border-bottom: none;">💊 {name}</h2>
+            <div style="font-size: 1.6rem; margin: 10px 0; color: #145A32;">
                 <strong>กินครั้งละ:</strong> {dosage}<br>
-                <strong>เหลือ:</strong> {stock} เม็ด
-            </p>
+                <strong>เหลือ:</strong> <span style="color:#C0392B; font-weight:bold;">{stock}</span> เม็ด
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # Action Button
-        col1, col2 = st.columns([3, 1])
+        # Action Button - Full Width for easier clicking
         if on_click_action:
-            if col1.button(f"✅ กินแล้ว ({name})", key=f"take_{med_id}", type="primary", use_container_width=True):
+            if st.button(f"✅ กินแล้ว ({name})", key=f"take_{med_id}", type="primary", use_container_width=True):
                 on_click_action(med_id, name)

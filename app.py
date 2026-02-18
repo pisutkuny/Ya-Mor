@@ -21,29 +21,46 @@ ai_vision.configure_genai()
 # --- Custom CSS for Senior UI ---
 st.markdown("""
 <style>
-    /* Global Font Increase */
+    /* Global Font Increase - Super Large */
     html, body, [class*="css"] {
         font-family: 'Sarabun', sans-serif;
-        font-size: 20px;
+        font-size: 26px; /* Increased from 20px */
     }
     
-    /* Big Headers */
-    h1 { font-size: 2.5rem !important; color: #1B4F72; text-align: center; }
-    h2 { font-size: 2rem !important; color: #154360; border-bottom: 2px solid #D4E6F1; }
-    h3 { font-size: 1.6rem !important; color: #21618C; }
+    /* Massive Headers */
+    h1 { font-size: 3rem !important; color: #1B4F72; text-align: center; margin-bottom: 20px; }
+    h2 { font-size: 2.2rem !important; color: #154360; border-bottom: 3px solid #D4E6F1; padding-bottom: 10px; }
+    h3 { font-size: 1.8rem !important; color: #21618C; }
+    p, div, label, span { font-size: 1.4rem !important; }
     
-    /* Button overrides are in ui_components.py but global stButton needs size */
+    /* Super Big Buttons */
     .stButton > button {
-        height: 70px;
-        font-size: 1.5rem !important;
-        border-radius: 15px;
-        margin-bottom: 10px;
+        height: 80px !important;
+        font-size: 1.8rem !important;
+        font-weight: bold !important;
+        border-radius: 20px !important;
+        margin-bottom: 15px !important;
+        border: 2px solid #ccc !important;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
     }
     
-    /* Input fields */
+    /* Input fields - Taller and larger text */
     div[data-baseweb="input"] > div {
-        height: 50px;
-        font-size: 1.2rem;
+        height: 60px !important;
+    }
+    input {
+        font-size: 1.4rem !important;
+    }
+    
+    /* Checkbox/Radio sizes */
+    label[data-baseweb="checkbox"] {
+        font-size: 1.5rem !important;
+    }
+    
+    /* Spacing */
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -121,23 +138,30 @@ def render_dashboard():
 
     st.divider()
 
-    # 3. Add New Med Button
-    if st.button("📸 เพิ่มยาใหม่ (ถ่ายรูป)", type="primary", use_container_width=True):
+    # 3. Add New Med Button (Giant Square-ish Style)
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📸 เพิ่มยาใหม่ (ถ่ายรูป)", type="primary", use_container_width=True, key="add_med_big"):
         navigate_to('scan')
     
     st.divider()
     
-    # 4. SOS Button
+    # 4. SOS Button (Red, Huge)
     st.markdown("""
         <a href="tel:1669" style="text-decoration: none;">
-            <button style="
-                width: 100%; height: 80px; background-color: #C0392B; color: white; 
-                font-size: 2rem; border-radius: 20px; border: none; font-weight: bold; cursor: pointer;">
-                🚑 แจ้งฉุกเฉิน (โทรลูกหลาน)
-            </button>
+            <div style="
+                display: flex; justify-content: center; align-items: center;
+                width: 100%; height: 100px; 
+                background-color: #C0392B; color: white; 
+                font-size: 2.2rem; border-radius: 25px; 
+                font-weight: bold; cursor: pointer;
+                box-shadow: 0px 5px 10px rgba(0,0,0,0.2);
+                border: 3px solid white;
+            ">
+                🚑 แจ้งฉุกเฉิน
+            </div>
         </a>
     """, unsafe_allow_html=True)
-    st.caption("*กดปุ่มแดงเพื่อโทรออกทันที")
+    st.caption("*กดปุ่มแดงเพื่อโทรออกทันที", unsafe_allow_html=False)
 
 def render_scan():
     st.title("📸 เพิ่มยาใหม่")
