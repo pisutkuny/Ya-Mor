@@ -159,34 +159,45 @@ def render_dashboard():
 
     st.divider()
 
-    # 3. Add New Med Button (Giant Square-ish Style)
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("📸 เพิ่มยาใหม่ (ถ่ายรูป)", type="primary", use_container_width=True, key="add_med_big"):
+    
+    st.divider()
+
+    # 3. Add New Med Button (Camera Icon)
+    st.markdown("""
+    <style>
+    div.stButton > button:first-child {
+        background-color: #2ECC71;
+        color: white;
+        height: auto;
+        padding: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    if st.button("📸\nถ่ายรูปเพิ่มยา", type="primary", use_container_width=True, key="add_med_btn"):
         navigate_to('scan')
     
     st.divider()
     
-    # 4. SOS Button (Red, Huge)
+    # 4. SOS Button (Ambulance Icon)
     st.markdown("""
         <a href="tel:1669" style="text-decoration: none;">
             <div style="
-                display: flex; justify-content: center; align-items: center;
-                width: 100%; min-height: 100px; /* Allow growing */
-                padding: 10px;
+                display: flex; flex-direction: column; justify-content: center; align-items: center;
+                width: 100%; min-height: 120px; 
+                padding: 15px;
                 background-color: #C0392B; color: white; 
-                font-size: clamp(1.8rem, 6vw, 2.2rem); 
-                text-align: center;
-                line-height: 1.2;
                 border-radius: 25px; 
                 font-weight: bold; cursor: pointer;
-                box-shadow: 0px 5px 10px rgba(0,0,0,0.2);
-                border: 3px solid white;
+                box-shadow: 0px 5px 15px rgba(192, 57, 43, 0.4);
+                border: 4px solid white;
+                transition: transform 0.1s;
             ">
-                🚑 แจ้งฉุกเฉิน
+                <span style="font-size: 4rem; line-height: 1;">🚑</span>
+                <span style="font-size: clamp(1.6rem, 5vw, 2rem); margin-top: 5px;">แจ้งฉุกเฉิน</span>
             </div>
         </a>
     """, unsafe_allow_html=True)
-    st.caption("*กดปุ่มแดงเพื่อโทรออกทันที", unsafe_allow_html=False)
 
 def render_scan():
     st.title("📸 เพิ่มยาใหม่")
