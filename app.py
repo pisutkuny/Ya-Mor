@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import io
 from PIL import Image
+from gtts import gTTS
 
 # Import Modules
 from modules import database, ai_vision, ui_components, notifications
@@ -199,27 +201,64 @@ def render_dashboard():
         </a>
     """, unsafe_allow_html=True)
 
+def play_audio(text):
+    """Generates and plays TTS audio"""
+    try:
+        tts = gTTS(text=text, lang='th')
+        sound_file = io.BytesIO()
+        tts.write_to_fp(sound_file)
+        st.audio(sound_file, format='audio/mp3', autoplay=True)
+    except Exception as e:
+        st.error(f"Audio Error: {e}")
+
 def render_scan():
     st.title("📸 เพิ่มยาใหม่")
     if st.button("⬅️ กลับหน้าหลัก"):
+        # Clear scan data when leaving
+        if 'scanned_data' in st.session_state:
+            del st.session_state.scanned_data
         navigate_to('dashboard')
         
-    uploaded_file = st.file_uploader("ถ่ายรูปซองยา/ขวดยา", type=['jpg', 'jpeg', 'png'])
+    # Auto-Scan Logic: Key ensures reset on new upload
+    uploaded_file = st.file_uploader("ถ่ายรูปซองยา/ขวดยา", type=['jpg', 'jpeg', 'png'], key="med_upload")
     
     if uploaded_file:
         image = Image.open(uploaded_file)
         st.image(image, caption='รูปยา', use_column_width=True)
         
-        if st.button("🔍 ให้ AI อ่านฉลากยา", type="primary"):
-            data = ai_vision.extract_medicine_info(image)
-            if data:
-                st.session_state.scanned_data = data
-                st.success("อ่านฉลากเสร็จแล้ว! ตรวจสอบด้านล่าง")
+        # Check if we already scanned this specific file or if it's new
+        # Simple heuristic: If scanned_data exists, we assume it's done. 
+        # If user removes file, 'uploaded_file' becomes None and we iterate.
+        # But if they upload a NEW file, the 'key' might not change if we don't force it, 
+        # but Streamlit usually handles re-upload by clearing state if key is same but file distinct? 
+        # Actually simplest is: If 'scanned_data' is NOT in session state, DO IT.
+        
+        if 'scanned_data' not in st.session_state:
+            with st.spinner("🤖 AI กำลังอ่านฉลากยา... รอสักครู่นะคะ"):
+                data = ai_vision.extract_medicine_info(image)
+                if data:
+                    st.session_state.scanned_data = data
+                    # Audio Feedback
+                    med_name = data.get('medicine_name', 'ยา')
+                    # Create a friendly summary
+                    summary = f"เจอแล้วค่ะ {med_name} "
+                    freqs = data.get('frequency', [])
+                    if freqs:
+                        th_freqs = []
+                        if "morning" in freqs: th_freqs.append("เช้า")
+                        if "noon" in freqs: th_freqs.append("เที่ยง")
+                        if "evening" in freqs: th_freqs.append("เย็น")
+                        if "bedtime" in freqs: th_freqs.append("ก่อนนอน")
+                        summary += f"กินช่วง {' '.join(th_freqs)} ค่ะ"
+                    
+                    play_audio(summary)
+                    st.rerun()
             
     if 'scanned_data' in st.session_state:
         data = st.session_state.scanned_data
         
         with st.form("save_med_form"):
+            st.success("✅ AI อ่านข้อมูลเรียบร้อย (กดบันทึกด้านล่าง)")
             name = st.text_input("ชื่อยา", value=data.get('medicine_name', ''))
             dosage = st.text_input("ปริมาณ (เช่น 1 เม็ด)", value=data.get('dosage', ''))
             
@@ -234,7 +273,8 @@ def render_scan():
             
             stock = st.number_input("จำนวนยาที่มี (เม็ด)", min_value=0, value=10)
             
-            if st.form_submit_button("💾 บันทึกข้อมูลยา"):
+            # Big Save Button
+            if st.form_submit_button("💾 บันทึกข้อมูลยา", type="primary"):
                 freq_list = []
                 if morning: freq_list.append("morning")
                 if noon: freq_list.append("noon")
@@ -244,6 +284,7 @@ def render_scan():
                 success = database.add_medication(name, "path/to/img", dosage, freq_list, stock)
                 if success:
                     st.success("บันทึกเรียบร้อย!")
+                    play_audio(f"บันทึก {name} เรียบร้อยแล้วค่ะ") 
                     del st.session_state.scanned_data
                     navigate_to('dashboard')
 
