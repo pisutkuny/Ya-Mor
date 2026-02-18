@@ -22,14 +22,14 @@ def med_card(med_data, on_click_action=None):
         st.markdown(f"""
         <div style="
             background-color: #E8F8F5; 
-            padding: 25px; 
+            padding: 20px; 
             border-radius: 20px; 
             border: 3px solid #1ABC9C;
             margin-bottom: 20px;
             box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
         ">
-            <h2 style="margin:0; color:#0E6251; font-size: 2.2rem; border-bottom: none;">💊 {name}</h2>
-            <div style="font-size: 1.6rem; margin: 10px 0; color: #145A32;">
+            <h2 style="margin:0; color:#0E6251; font-size: clamp(1.8rem, 6vw, 2.2rem); border-bottom: none;">💊 {name}</h2>
+            <div style="font-size: clamp(1.2rem, 4vw, 1.6rem); margin: 10px 0; color: #145A32; line-height: 1.4;">
                 <strong>กินครั้งละ:</strong> {dosage}<br>
                 <strong>เหลือ:</strong> <span style="color:#C0392B; font-weight:bold;">{stock}</span> เม็ด
             </div>

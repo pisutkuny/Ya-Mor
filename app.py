@@ -21,46 +21,67 @@ ai_vision.configure_genai()
 # --- Custom CSS for Senior UI ---
 st.markdown("""
 <style>
-    /* Global Font Increase - Super Large */
+    /* Fluid Typography: Scales with screen width but never gets too small */
     html, body, [class*="css"] {
         font-family: 'Sarabun', sans-serif;
-        font-size: 26px; /* Increased from 20px */
+        /* Minimum 18px, Preference 5% of viewport width, Maximum 26px */
+        font-size: clamp(20px, 5vw, 26px); 
     }
     
-    /* Massive Headers */
-    h1 { font-size: 3rem !important; color: #1B4F72; text-align: center; margin-bottom: 20px; }
-    h2 { font-size: 2.2rem !important; color: #154360; border-bottom: 3px solid #D4E6F1; padding-bottom: 10px; }
-    h3 { font-size: 1.8rem !important; color: #21618C; }
-    p, div, label, span { font-size: 1.4rem !important; }
+    /* Responsive Headers */
+    h1 { 
+        font-size: clamp(2rem, 8vw, 3rem) !important; 
+        color: #1B4F72; 
+        text-align: center; 
+        margin-bottom: 20px; 
+    }
+    h2 { 
+        font-size: clamp(1.6rem, 6vw, 2.2rem) !important; 
+        color: #154360; 
+        border-bottom: 3px solid #D4E6F1; 
+        padding-bottom: 10px; 
+    }
+    h3 { font-size: 1.4rem !important; color: #21618C; }
+    p, div, label, span { font-size: 1rem !important; }
     
-    /* Super Big Buttons */
+    /* Responsive Buttons */
     .stButton > button {
-        height: 80px !important;
-        font-size: 1.8rem !important;
+        min-height: 70px !important; /* Allow growing if text wraps */
+        height: auto !important;
+        padding-top: 15px !important;
+        padding-bottom: 15px !important;
+        font-size: clamp(1.4rem, 5vw, 1.8rem) !important;
         font-weight: bold !important;
         border-radius: 20px !important;
         margin-bottom: 15px !important;
         border: 2px solid #ccc !important;
         box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+        white-space: normal !important; /* Allow text wrapping */
+        word-wrap: break-word !important;
+        line-height: 1.3 !important;
     }
     
-    /* Input fields - Taller and larger text */
+    /* Input fields */
     div[data-baseweb="input"] > div {
-        height: 60px !important;
+        min-height: 60px !important;
+        height: auto !important;
     }
     input {
-        font-size: 1.4rem !important;
+        font-size: 1rem !important;
     }
     
-    /* Checkbox/Radio sizes */
-    label[data-baseweb="checkbox"] {
-        font-size: 1.5rem !important;
+    /* Checkbox/Radio size fix */
+    label[data-baseweb="checkbox"] div:first-child {
+        transform: scale(1.5); /* Scale up the checkbox box itself */
+        margin-right: 15px;
     }
-    
-    /* Spacing */
+
+    /* Container Spacing for Mobile */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 5rem;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -150,9 +171,13 @@ def render_dashboard():
         <a href="tel:1669" style="text-decoration: none;">
             <div style="
                 display: flex; justify-content: center; align-items: center;
-                width: 100%; height: 100px; 
+                width: 100%; min-height: 100px; /* Allow growing */
+                padding: 10px;
                 background-color: #C0392B; color: white; 
-                font-size: 2.2rem; border-radius: 25px; 
+                font-size: clamp(1.8rem, 6vw, 2.2rem); 
+                text-align: center;
+                line-height: 1.2;
+                border-radius: 25px; 
                 font-weight: bold; cursor: pointer;
                 box-shadow: 0px 5px 10px rgba(0,0,0,0.2);
                 border: 3px solid white;
